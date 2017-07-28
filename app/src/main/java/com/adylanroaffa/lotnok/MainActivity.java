@@ -1,5 +1,7 @@
 package com.adylanroaffa.lotnok;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.icu.text.SimpleDateFormat;
 import android.icu.util.Calendar;
@@ -61,6 +63,9 @@ public class MainActivity extends AppCompatActivity {
         // initialize data, labels text, and adapter for the rv
         initData();
 
+
+        //make alarm manager for notification
+
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.newTask_button);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -111,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
 
         /**
          *  Load one time events
-          */
+         */
         List<OneTimeDatabase> oneTimeDatas = new Select().from(OneTimeDatabase.class).queryList();
         for (OneTimeDatabase oneTimeData : oneTimeDatas) {
 
@@ -122,17 +127,20 @@ public class MainActivity extends AppCompatActivity {
             endTime.setByDate(oneTimeData.getEndTime());
 
             tasks.add(new Task(oneTimeData.getName(), oneTimeData.getNotes(), oneTimeData.getLoc(), startTime, endTime));
+
+            // set alarm manager for the latest task
+            setAlarm(startTime);
         }
 
         /**
          *  Load scheduled events
-          */
+         */
         List<ScheduledDatabase> scheduledDatas = new Select().from(ScheduledDatabase.class).queryList();
         for (ScheduledDatabase scheduledData : scheduledDatas) {
 
             /**
              *  Get event's properties except day (day may be null except for weekly events)
-              */
+             */
             String name = scheduledData.getName();
 
             // get event's start and end time as a Date Time
@@ -171,6 +179,7 @@ public class MainActivity extends AppCompatActivity {
                         tasks.add(new Task(name, notes, loc, currentStartTime, currentEndTime));
 
                         now.add(Calendar.DATE, 1);
+                        setAlarm(currentStartTime);
                     }
 
                     break;
@@ -201,6 +210,7 @@ public class MainActivity extends AppCompatActivity {
                         tasks.add(new Task(name, notes, loc, currentStartTime, currentEndTime));
 
                         now.add(Calendar.DATE, 7);
+                        setAlarm(currentStartTime);
                     }
 
                     break;
@@ -228,6 +238,7 @@ public class MainActivity extends AppCompatActivity {
                         tasks.add(new Task(name, notes, loc, currentStartTime, currentEndTime));
 
                         now.add(Calendar.MONTH, 1);
+                        setAlarm(currentStartTime);
                     }
 
                     break;
@@ -284,17 +295,19 @@ public class MainActivity extends AppCompatActivity {
                         tasks.add(new Task(name, notes, loc, currentStartTime, currentEndTime));
 
                         now.add(Calendar.YEAR, 1);
+
+//                        set alarm for the latest date
+                        setAlarm(currentStartTime);
                     }
 
                     break;
 
             }
-
         }
 
         /**
          *  Sort tasks list by start date, and remove tasks that has passed
-          */
+         */
         Collections.sort(tasks);
         Date now = new Date();
         Iterator<Task> iter = tasks.iterator();
@@ -302,8 +315,10 @@ public class MainActivity extends AppCompatActivity {
             Task nextTask = iter.next();
             if (nextTask.getStartTime().getByDate().compareTo(now) < 0) {
                 iter.remove();
+
             }
         }
+
 
         /**
          *  Refresh task adapter data
@@ -315,8 +330,27 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateRVAdapter(){
 
-        taskAdapter = new TaskAdapter(this,tasks);
+        taskAdapter = new TaskAdapter(this,tasks.subList(0,tasks.size()));
         rv.setAdapter(taskAdapter);
+
+    }
+
+    private void setAlarm(DateTime startTime) {
+
+        Calendar alarmCalendar = Calendar.getInstance();
+        alarmCalendar.set(Calendar.MONTH,startTime.getMonth());
+        alarmCalendar.set(Calendar.DAY_OF_MONTH,startTime.getDay());
+        alarmCalendar.set(Calendar.HOUR_OF_DAY,startTime.getHour());
+        alarmCalendar.set(Calendar.MINUTE,startTime.getMinute());
+
+
+        Intent intent = new Intent(getApplicationContext(),NotificationReceiver.class);
+
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(getApplicationContext(),100,intent,PendingIntent.FLAG_UPDATE_CURRENT);
+
+        AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+
+        alarmManager.setExact(AlarmManager.RTC_WAKEUP,calendar.getTimeInMillis(),pendingIntent);
 
     }
 }
